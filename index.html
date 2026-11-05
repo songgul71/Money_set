@@ -1,0 +1,93 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="소비 전에 필요한 지출인지 판단하는 개인 지출계획 데모">
+  <title>지출계획</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css">
+  <script defer src="js/calculations.js"></script>
+  <script defer src="js/storage.js"></script>
+  <script defer src="js/main.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">본문으로 이동</a>
+  <main id="content" class="shell" tabindex="-1"><p role="status">불러오는 중이에요.</p></main>
+  <div id="notice" class="snackbar" role="status" aria-live="polite" hidden></div>
+  <noscript>지출계획을 사용하려면 브라우저의 JavaScript를 켜 주세요.</noscript>
+
+  <template id="home-template">
+    <header class="page-header"><p class="caption eyebrow">PoC 0.1</p><h1>지출계획</h1></header>
+    <nav class="month-nav" aria-label="계획 월 선택">
+      <a data-month="-1" class="month-arrow"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></a>
+      <time class="month-label" aria-current="date"></time>
+      <a data-month="1" class="month-arrow"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></a>
+    </nav>
+    <p class="caption month-help">매월 1일부터 말일까지 계산해요.</p>
+    <section class="card" aria-labelledby="income-title">
+      <div class="row start"><div><h2 id="income-title" class="small muted normal">계산 기준 수입</h2><p id="income-amount" class="amount-lg">0원</p></div><a id="income-link" class="text-button small">수입 입력</a></div>
+      <p id="income-description" class="small muted card-foot">아직 등록한 수입이 없어요.</p>
+    </section>
+    <section class="card" aria-labelledby="balance-title"><h2 id="balance-title" class="section-heading">예상 잔액</h2><dl class="balances">
+      <div><dt>필수 지출 후</dt><dd data-balance="afterEssential">0원</dd></div>
+      <div><dt>필수 + 선택 지출 후</dt><dd data-balance="afterEssentialAndOptional">0원</dd></div>
+      <div><dt>전체 계획 후</dt><dd data-balance="afterAllPlans">0원</dd></div>
+    </dl><p class="caption balance-help">보류는 전체 계획에만 포함돼요.</p></section>
+    <a id="new-plan" class="ui-button wide add-plan">계획 추가</a>
+    <section id="empty-plans" class="card empty" aria-labelledby="empty-plan-title"><h2 id="empty-plan-title">아직 등록한 지출계획이 없어요</h2><p class="small muted empty-copy">앞으로 쓸 돈을 하나씩 적고 필수·선택·보류로 판단할 수 있어요.</p><div class="badges" aria-label="지출 판단 종류"><span class="badge essential">필수</span><span class="badge optional">선택</span><span class="badge hold">보류</span></div></section>
+    <div id="plan-groups"></div>
+    <section class="follow-up" aria-label="추가 항목">
+      <button type="button" class="menu-row" disabled><span>완료 항목 0건 보기</span><span aria-hidden="true">›</span></button>
+      <button type="button" class="menu-row" id="canceled-toggle" aria-expanded="false" aria-controls="canceled-plans"><span>취소 항목 0건 보기</span><span aria-hidden="true">›</span></button>
+      <div id="canceled-plans" hidden></div>
+      <button type="button" class="menu-row" disabled><span>월간 요약</span><span aria-hidden="true">›</span></button>
+    </section>
+  </template>
+
+  <template id="plan-template">
+    <header class="page-header"><p class="caption eyebrow" id="form-month"></p><h1 id="form-heading">계획 등록</h1></header>
+    <form id="plan-form" novalidate class="plan-form">
+      <div class="field"><label for="title" class="ui-label bold">지출명 <span aria-hidden="true">*</span></label><input id="title" name="title" class="ui-input" maxlength="80" placeholder="예: 운동화" required><p id="title-error" class="field-error" hidden></p></div>
+      <div class="field amount-field"><label for="amount" class="ui-label bold">예상금액 <span aria-hidden="true">*</span></label><div class="amount-input"><input id="amount" name="amount" class="ui-input" inputmode="numeric" maxlength="20" placeholder="0" required><span>원</span></div><p id="amount-error" class="field-error" hidden></p></div>
+      <fieldset class="judgment-field"><legend class="bold">이 지출은 어떤 지출인가요? <span aria-hidden="true">*</span></legend><div class="choices">
+        <label class="choice"><input type="radio" name="judgment" value="essential" required><span class="badge essential bold">필수</span><span class="small muted">꼭 필요해요</span></label>
+        <label class="choice"><input type="radio" name="judgment" value="optional"><span class="badge optional bold">선택</span><span class="small muted">상황에 따라 선택해요</span></label>
+        <label class="choice"><input type="radio" name="judgment" value="hold"><span class="badge hold bold">보류</span><span class="small muted">조금 더 생각해요</span></label>
+      </div><p id="judgment-error" class="field-error" hidden></p></fieldset>
+      <section class="card preview" aria-labelledby="preview-title"><div class="row preview-title"><h2 id="preview-title" class="body-heading">저장 후 예상 잔액</h2><span id="preview-month" class="caption muted"></span></div><dl class="balances">
+        <div><dt>필수 지출 후</dt><dd data-balance="afterEssential">0원</dd></div><div><dt>필수 + 선택 지출 후</dt><dd data-balance="afterEssentialAndOptional">0원</dd></div><div><dt>전체 계획 후</dt><dd data-balance="afterAllPlans">0원</dd></div>
+      </dl><p class="caption balance-help">현재 등록된 수입과 계획을 기준으로 계산해요.</p><p id="preview-error" class="field-error" hidden></p></section>
+      <section class="optional-fields"><button type="button" id="details-toggle" class="details-toggle" aria-expanded="false" aria-controls="optional-fields"><span>추가 정보 <span class="muted normal">(선택)</span></span><span aria-hidden="true" id="details-arrow">⌄</span></button><div id="optional-fields" hidden>
+        <div class="field"><label for="expectedDate" class="ui-label">지출예상일 <span class="muted">(선택)</span></label><input id="expectedDate" name="expectedDate" type="date" class="ui-input"><p id="expectedDate-error" class="field-error" hidden></p></div>
+        <div class="field"><label for="categoryId" class="ui-label">카테고리 <span class="muted">(선택)</span></label><select id="categoryId" name="categoryId" class="ui-input"><option value="">선택하지 않음</option></select><p id="categoryId-error" class="field-error" hidden></p></div>
+        <div><label for="note" class="ui-label">메모 <span class="muted">(선택)</span></label><textarea id="note" name="note" class="ui-input" maxlength="500" placeholder="필요한 내용만 적어 주세요."></textarea><p id="note-error" class="field-error" hidden></p></div>
+      </div></section>
+      <p id="form-error" role="alert" class="error-panel" hidden></p>
+      <div class="bottom-bar"><div class="bottom-actions"><a id="form-cancel" class="secondary-button">취소</a><button type="submit" class="ui-button">계획 저장</button></div></div>
+    </form>
+  </template>
+
+  <template id="income-template">
+    <header class="page-header"><p class="caption eyebrow" id="form-month"></p><h1 id="form-heading">수입 관리</h1></header>
+    <a id="home-link" class="text-button back-link">‹ 지출계획으로</a>
+    <section class="card"><h2 class="small muted normal">계산 기준 수입</h2><p id="income-amount" class="amount-lg"></p><p id="income-breakdown" class="small muted card-foot"></p></section>
+    <div id="income-list"></div>
+    <section class="card"><h2 id="income-form-title" class="section-heading">수입 등록</h2><form id="income-form" novalidate>
+      <div class="field"><label class="ui-label bold" for="name">수입명 *</label><input id="name" name="name" class="ui-input" maxlength="50" placeholder="예: 월급" required><p id="name-error" class="field-error" hidden></p></div>
+      <div class="field"><label class="ui-label bold" for="amount">금액 *</label><div class="amount-input"><input id="amount" name="amount" class="ui-input" inputmode="numeric" maxlength="20" placeholder="0" required><span>원</span></div><p id="amount-error" class="field-error" hidden></p></div>
+      <div class="field"><label class="ui-label bold" for="incomeType">수입 종류</label><select id="incomeType" name="incomeType" class="ui-input"><option value="regular">정기수입</option><option value="irregular">비정기 수입</option></select></div>
+      <div class="field"><label class="ui-label bold" for="status">입금 상태</label><select id="status" name="status" class="ui-input"><option value="scheduled">입금 예정</option><option value="deposited">입금 완료</option></select></div>
+      <div class="field"><label class="ui-label" for="expectedDate">예정일 <span id="expected-required">*</span></label><input id="expectedDate" name="expectedDate" type="date" class="ui-input"><p id="expectedDate-error" class="field-error" hidden></p></div>
+      <div class="field" id="deposit-field" hidden><label class="ui-label" for="depositedDate">입금일 *</label><input id="depositedDate" name="depositedDate" type="date" class="ui-input"><p class="caption muted">입금일이 속한 월에 반영돼요.</p><p id="depositedDate-error" class="field-error" hidden></p></div>
+      <div class="field" id="include-field" hidden><label class="check-label"><input id="includeInCalculation" name="includeInCalculation" type="checkbox"> 계산에 포함</label></div>
+      <div class="field"><label class="ui-label" for="note">메모 <span class="muted">(선택)</span></label><textarea id="note" name="note" class="ui-input" maxlength="500"></textarea><p id="note-error" class="field-error" hidden></p></div>
+      <p id="form-error" role="alert" class="error-panel" hidden></p><div class="actions"><button class="ui-button" type="submit">수입 저장</button><a id="income-cancel" class="secondary-button" hidden>편집 취소</a></div>
+    </form></section>
+  </template>
+
+  <template id="backup-template">
+    <details class="backup"><summary>데이터 관리</summary><div class="backup-content"><p class="caption muted">이 브라우저에 저장돼요. 보관할 내용은 파일로 내보내 주세요.</p><div class="actions"><button type="button" class="secondary-button" data-action="export">JSON 내보내기</button><button type="button" class="secondary-button" data-action="import">JSON 불러오기</button><button type="button" class="text-button danger" data-action="reset">앱 데이터 초기화</button></div><input type="file" id="import-file" accept=".json,application/json" hidden><p id="backup-message" class="small" role="status"></p></div></details>
+  </template>
+</body>
+</html>
